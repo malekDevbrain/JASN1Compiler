@@ -1,4 +1,4 @@
-package org.jasn1.compiler;/*
+/*
  * Copyright 2011-17 Fraunhofer ISE
  *
  * This file is part of jASN1.
@@ -18,7 +18,7 @@ package org.jasn1.compiler;/*
  * along with jASN1.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
+package org.jasn1.compiler;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -562,13 +562,26 @@ public class BerClassWriter {
 
         writeEmptyConstructor(className);
 
+        if (!jaxbMode) {
+            writeEncodeConstructor(className, componentTypes);
+        }
+
+        if (jaxbMode) {
+            writeGetterAndSetter(componentTypes);
+        }
 
 
-        writeChoiceToStringFunction(componentTypes);
+
+
+
+
+
+
 
         write("}\n");
 
     }
+
 
     private void setClassNamesOfComponents(List<String> listOfSubClassNames, List<AsnElementType> componentTypes) {
         for (AsnElementType element : componentTypes) {
@@ -721,12 +734,25 @@ public class BerClassWriter {
 
         writeEmptyConstructor(className);
 
+        if (!jaxbMode) {
+            writeEncodeConstructor(className, componentTypes);
+        }
+
+        if (jaxbMode) {
+            writeGetterAndSetter(componentTypes);
+        }
+
+        boolean hasExplicitTag = (tag != null) && (tag.type == TagType.EXPLICIT);
 
 
 
 
 
-        writeSequenceOrSetToStringFunction(componentTypes);
+
+
+
+
+
 
         write("}\n");
 
@@ -748,17 +774,8 @@ public class BerClassWriter {
         }
     }
 
-    private void writeSimpleDecodeFunction(String param) throws IOException {
-        write("public int decode(InputStream is) throws IOException {");
-        write("return decode(is, " + param + ");");
-        write("}\n");
-    }
 
-    private void writeSimpleEncodeFunction() throws IOException {
-        write("public int encode(BerByteArrayOutputStream os) throws IOException {");
-        write("return encode(os, true);");
-        write("}\n");
-    }
+
 
     private void writeSequenceOfClass(String className, AsnSequenceOf asnSequenceOf, Tag tag, String isStaticStr,
                                       List<String> listOfSubClassNames) throws IOException {
@@ -823,7 +840,13 @@ public class BerClassWriter {
 
 
 
-        writeSequenceOrSetOfToStringFunction(referencedTypeName, componentType);
+
+
+
+
+
+
+
 
         write("}\n");
 
@@ -882,9 +905,7 @@ public class BerClassWriter {
 
         if (tag != null) {
 
-            if (isDirectAnyOrChoice((AsnTaggedType) typeDefinition)) {
-                writeSimpleEncodeFunction();
-            }
+
 
             write("public int encode(BerByteArrayOutputStream os, boolean withTag) throws IOException {\n");
 
@@ -922,9 +943,7 @@ public class BerClassWriter {
             write("return codeLength;");
             write("}\n");
 
-            if (isDirectAnyOrChoice((AsnTaggedType) typeDefinition)) {
-                writeSimpleDecodeFunction("true");
-            }
+
 
             write("public int decode(InputStream is, boolean withTag) throws IOException {\n");
 
@@ -984,167 +1003,10 @@ public class BerClassWriter {
         write("}\n");
     }
 
-    private void writeChoiceToStringFunction(List<AsnElementType> componentTypes) throws IOException {
-        writeToStringFunction();
 
-        write("public void appendAsString(StringBuilder sb, int indentLevel) {\n");
 
-        for (int j = 0; j < componentTypes.size(); j++) {
-            AsnElementType componentType = componentTypes.get(j);
 
-            write("if (" + getName(componentType) + " != null) {");
 
-            if (!isPrimitive(getUniversalType(componentType))) {
-                write("sb.append(\"" + getName(componentType) + ": \");");
-                write(getName(componentType) + ".appendAsString(sb, indentLevel + 1);");
-            }
-            else {
-                write("sb.append(\"" + getName(componentType) + ": \").append(" + getName(componentType) + ");");
-            }
-            write("return;");
-            write("}\n");
-        }
-
-        write("sb.append(\"<none>\");");
-
-        write("}\n");
-
-    }
-
-    private void writeSequenceOrSetToStringFunction(List<AsnElementType> componentTypes) throws IOException {
-
-        writeToStringFunction();
-
-        write("public void appendAsString(StringBuilder sb, int indentLevel) {\n");
-
-        write("sb.append(\"{\");");
-
-        boolean checkIfFirstSelectedElement = componentTypes.size() > 1;
-
-        int j = 0;
-
-        for (AsnElementType componentType : componentTypes) {
-
-            if (isOptional(componentType)) {
-                if (j == 0 && componentTypes.size() > 1) {
-                    write("boolean firstSelectedElement = true;");
-                }
-                write("if (" + getName(componentType) + " != null) {");
-            }
-
-            if (j != 0) {
-                if (checkIfFirstSelectedElement) {
-
-                    write("if (!firstSelectedElement) {");
-
-                }
-                write("sb.append(\",\\n\");");
-                if (checkIfFirstSelectedElement) {
-                    write("}");
-                }
-            }
-            else {
-                write("sb.append(\"\\n\");");
-            }
-
-            write("for (int i = 0; i < indentLevel + 1; i++) {");
-            write("sb.append(\"\\t\");");
-            write("}");
-            if (!isOptional(componentType)) {
-                write("if (" + getName(componentType) + " != null) {");
-            }
-            if (!isPrimitive(getUniversalType(componentType))) {
-                write("sb.append(\"" + getName(componentType) + ": \");");
-                write(getName(componentType) + ".appendAsString(sb, indentLevel + 1);");
-            }
-            else {
-                write("sb.append(\"" + getName(componentType) + ": \").append(" + getName(componentType) + ");");
-            }
-            if (!isOptional(componentType)) {
-                write("}");
-                write("else {");
-                write("sb.append(\"" + getName(componentType) + ": <empty-required-field>\");");
-                write("}");
-            }
-
-            if (isOptional(componentType)) {
-                if (checkIfFirstSelectedElement) {
-                    write("firstSelectedElement = false;");
-                }
-                write("}");
-            }
-            else {
-                checkIfFirstSelectedElement = false;
-            }
-
-            write("");
-
-            j++;
-
-        }
-
-        write("sb.append(\"\\n\");");
-        write("for (int i = 0; i < indentLevel; i++) {");
-        write("sb.append(\"\\t\");");
-        write("}");
-        write("sb.append(\"}\");");
-
-        write("}\n");
-
-    }
-
-    private void writeSequenceOrSetOfToStringFunction(String referencedTypeName, AsnElementType componentType)
-            throws IOException {
-
-        writeToStringFunction();
-
-        write("public void appendAsString(StringBuilder sb, int indentLevel) {\n");
-
-        write("sb.append(\"{\\n\");");
-        write("for (int i = 0; i < indentLevel + 1; i++) {");
-        write("sb.append(\"\\t\");");
-        write("}");
-
-        write("if (seqOf == null) {");
-        write("sb.append(\"null\");");
-        write("}");
-        write("else {");
-        write("Iterator<" + referencedTypeName + "> it = seqOf.iterator();");
-        write("if (it.hasNext()) {");
-
-        if (!isPrimitive(getUniversalType(componentType))) {
-            write("it.next().appendAsString(sb, indentLevel + 1);");
-        }
-        else {
-            write("sb.append(it.next());");
-        }
-
-        write("while (it.hasNext()) {");
-        write("sb.append(\",\\n\");");
-        write("for (int i = 0; i < indentLevel + 1; i++) {");
-        write("sb.append(\"\\t\");");
-        write("}");
-
-        if (!isPrimitive(getUniversalType(componentType))) {
-            write("it.next().appendAsString(sb, indentLevel + 1);");
-        }
-        else {
-            write("sb.append(it.next());");
-        }
-
-        write("}");
-        write("}");
-        write("}\n");
-
-        write("sb.append(\"\\n\");");
-        write("for (int i = 0; i < indentLevel; i++) {");
-        write("sb.append(\"\\t\");");
-        write("}");
-        write("sb.append(\"}\");");
-
-        write("}\n");
-
-    }
 
 
 
@@ -1173,33 +1035,293 @@ public class BerClassWriter {
 
 
 
+    private void writeSetDecodeFunction(List<AsnElementType> componentTypes) throws IOException {
+        write("public int decode(InputStream is, boolean withTag) throws IOException {");
+        write("int codeLength = 0;");
+        write("int subCodeLength = 0;");
+        write("BerTag berTag = new BerTag();\n");
 
+        write("if (withTag) {");
+        write("codeLength += tag.decodeAndCheck(is);");
+        write("}\n");
+        write("BerLength length = new BerLength();");
+        write("codeLength += length.decode(is);\n");
+        write("int totalLength = length.val;");
 
-
-
-
-
-
-
-    private int getTagClassId(String tagClass) {
-
-        if (tagClass.equals("UNIVERSAL")) {
-            return BerTag.UNIVERSAL_CLASS;
-        }
-        else if (tagClass.equals("APPLICATION")) {
-            return BerTag.APPLICATION_CLASS;
-        }
-        else if (tagClass.equals("CONTEXT")) {
-            return BerTag.CONTEXT_CLASS;
-        }
-        else if (tagClass.equals("PRIVATE")) {
-            return BerTag.PRIVATE_CLASS;
-        }
-        else {
-            throw new IllegalStateException("unknown tag class: " + tagClass);
+        if (supportIndefiniteLength == true) {
+            writeSetDecodeIndefiniteLenghtPart(componentTypes);
         }
 
+        write("while (subCodeLength < totalLength) {");
+        write("subCodeLength += berTag.decode(is);");
+
+        for (int j = 0; j < componentTypes.size(); j++) {
+            AsnElementType componentType = componentTypes.get(j);
+
+            Tag componentTag = getTag(componentType);
+
+            String explicitEncoding = ", false";
+
+            String elseString = "";
+
+            if (j != 0) {
+                elseString = "else ";
+            }
+
+            if (isDirectAnyOrChoice(componentType)) {
+
+                if (!isExplicit(componentTag)) {
+                    throw new IOException("choice or ANY within set has no explicit tag.");
+                }
+                write(elseString + "if (berTag.equals(" + getBerTagParametersString(componentTag) + ")) {");
+
+                write("subCodeLength += new BerLength().decode(is);");
+                explicitEncoding = ", null";
+
+                write(getName(componentType) + " = new " + getClassNameOfComponent(componentType) + "();");
+
+                write("subCodeLength += " + getName(componentType) + ".decode(is" + explicitEncoding + ");");
+
+                write("}");
+
+            }
+            else {
+
+                if (componentTag != null) {
+                    if (isExplicit(componentTag)) {
+                        write(elseString + "if (berTag.equals(" + getBerTagParametersString(componentTag) + ")) {");
+                    }
+                    else {
+                        write(elseString + "if (berTag.equals(" + getBerTagParametersString(componentTag) + ")) {");
+                    }
+                    if (isExplicit(componentTag)) {
+                        write("subCodeLength += new BerLength().decode(is);");
+                        explicitEncoding = ", true";
+                    }
+                }
+                else {
+                    write(elseString + "if (berTag.equals(" + getClassNameOfComponent(componentType) + ".tag)) {");
+                }
+
+                write(getName(componentType) + " = new " + getClassNameOfComponent(componentType) + "();");
+
+                if (", null".equals(explicitEncoding)) {
+                    write("BerLength length2 = new BerLength();");
+                    write("subCodeLength += length2.decode(is);");
+                }
+
+                write("subCodeLength += " + getName(componentType) + ".decode(is" + explicitEncoding + ");");
+
+                write("}");
+
+            }
+
+        }
+
+        write("}");
+
+        write("if (subCodeLength != totalLength) {");
+        write("throw new IOException(\"Length of set does not match length tag, length tag: \" + totalLength + \", actual set length: \" + subCodeLength);\n");
+        write("}");
+        write("codeLength += subCodeLength;\n");
+
+        write("return codeLength;");
+        write("}\n");
     }
+
+    private void writeSequenceDecodeIndefiniteLenghtPart(List<AsnElementType> componentTypes) throws IOException {
+        write("if (totalLength == -1) {");
+        write("subCodeLength += berTag.decode(is);\n");
+
+        String initChoiceDecodeLength = "int ";
+
+        for (AsnElementType componentType : componentTypes) {
+
+            Tag componentTag = getTag(componentType);
+
+            write("if (berTag.tagNumber == 0 && berTag.tagClass == 0 && berTag.primitive == 0) {");
+            write("int nextByte = is.read();");
+            write("if (nextByte != 0) {");
+            write("if (nextByte == -1) {");
+            write("throw new EOFException(\"Unexpected end of input stream.\");");
+            write("}");
+            write("throw new IOException(\"Decoded sequence has wrong end of contents octets\");");
+            write("}");
+            write("codeLength += subCodeLength + 1;");
+            write("return codeLength;");
+            write("}");
+
+            String explicitEncoding;
+
+            if (isDirectAnyOrChoice(componentType)) {
+                if (isExplicit(componentTag)) {
+                    write("if (berTag.equals(" + getBerTagParametersString(componentTag) + ")) {");
+
+                    write("subCodeLength += length.decode(is);");
+                    explicitEncoding = "null";
+                }
+                else {
+                    explicitEncoding = "berTag";
+                }
+
+                write(getName(componentType) + " = new " + getClassNameOfComponent(componentType) + "();");
+
+                write(initChoiceDecodeLength + "choiceDecodeLength = " + getName(componentType) + ".decode(is, "
+                        + explicitEncoding + ");");
+                if (!isExplicit(componentTag)) {
+                    initChoiceDecodeLength = "";
+                }
+                write("if (choiceDecodeLength != 0) {");
+                write("subCodeLength += choiceDecodeLength;");
+
+                write("subCodeLength += berTag.decode(is);");
+                write("}");
+                write("else {");
+                write(getName(componentType) + " = null;");
+                write("}\n");
+
+                if (isExplicit(componentTag)) {
+                    write("}");
+                }
+
+            }
+            else {
+
+                explicitEncoding = ", false";
+
+                if (componentTag != null) {
+                    write("if (berTag.equals(" + getBerTagParametersString(componentTag) + ")) {");
+
+                    if (isExplicit(componentTag)) {
+                        write("codeLength += length.decode(is);");
+                        explicitEncoding = ", true";
+                    }
+                }
+                else {
+                    write("if (berTag.equals(" + getClassNameOfComponent(componentType) + ".tag)) {");
+                }
+
+                write(getName(componentType) + " = new " + getClassNameOfComponent(componentType) + "();");
+                write("subCodeLength += " + getName(componentType) + ".decode(is" + explicitEncoding + ");");
+                write("subCodeLength += berTag.decode(is);");
+                write("}");
+
+            }
+
+        }
+
+        write("int nextByte = is.read();");
+        write("if (berTag.tagNumber != 0 || berTag.tagClass != 0 || berTag.primitive != 0");
+        write("|| nextByte != 0) {");
+        write("if (nextByte == -1) {");
+        write("throw new EOFException(\"Unexpected end of input stream.\");");
+        write("}");
+        write("throw new IOException(\"Decoded sequence has wrong end of contents octets\");");
+        write("}");
+        write("codeLength += subCodeLength + 1;");
+
+        write("return codeLength;");
+        write("}\n");
+    }
+
+    private void writeSetDecodeIndefiniteLenghtPart(List<AsnElementType> componentTypes) throws IOException {
+        write("if (totalLength == -1) {");
+        write("subCodeLength += berTag.decode(is);\n");
+
+        String initChoiceDecodeLength = "int ";
+
+        for (AsnElementType componentType : componentTypes) {
+
+            Tag componentTag = getTag(componentType);
+
+            write("if (berTag.tagNumber == 0 && berTag.tagClass == 0 && berTag.primitive == 0) {");
+            write("int nextByte = is.read();");
+            write("if (nextByte != 0) {");
+            write("if (nextByte == -1) {");
+            write("throw new EOFException(\"Unexpected end of input stream.\");");
+            write("}");
+            write("throw new IOException(\"Decoded sequence has wrong end of contents octets\");");
+            write("}");
+            write("codeLength += subCodeLength + 1;");
+            write("return codeLength;");
+            write("}");
+
+            String explicitEncoding;
+
+            if (isDirectAnyOrChoice(componentType)) {
+                if (isExplicit(componentTag)) {
+                    write("if (berTag.equals(" + getBerTagParametersString(componentTag) + ")) {");
+
+                    write("subCodeLength += length.decode(is);");
+                    explicitEncoding = "null";
+                }
+                else {
+                    explicitEncoding = "berTag";
+                }
+
+                write(getName(componentType) + " = new " + getClassNameOfComponent(componentType) + "();");
+
+                write(initChoiceDecodeLength + "choiceDecodeLength = " + getName(componentType) + ".decode(is, "
+                        + explicitEncoding + ");");
+                if (!isExplicit(componentTag)) {
+                    initChoiceDecodeLength = "";
+                }
+                write("if (choiceDecodeLength != 0) {");
+                write("subCodeLength += choiceDecodeLength;");
+
+                write("subCodeLength += berTag.decode(is);");
+                write("}");
+                write("else {");
+                write(getName(componentType) + " = null;");
+                write("}\n");
+
+                if (isExplicit(componentTag)) {
+                    write("}");
+                }
+
+            }
+            else {
+
+                explicitEncoding = ", false";
+
+                if (componentTag != null) {
+                    write("if (berTag.equals(" + getBerTagParametersString(componentTag) + ")) {");
+
+                    if (isExplicit(componentTag)) {
+                        write("codeLength += length.decode(is);");
+                        explicitEncoding = ", true";
+                    }
+                }
+                else {
+                    write("if (berTag.equals(" + getClassNameOfComponent(componentType) + ".tag)) {");
+                }
+
+                write(getName(componentType) + " = new " + getClassNameOfComponent(componentType) + "();");
+                write("subCodeLength += " + getName(componentType) + ".decode(is" + explicitEncoding + ");");
+                write("subCodeLength += berTag.decode(is);");
+                write("}");
+
+            }
+
+        }
+
+        write("int nextByte = is.read();");
+        write("if (berTag.tagNumber != 0 || berTag.tagClass != 0 || berTag.primitive != 0");
+        write("|| nextByte != 0) {");
+        write("if (nextByte == -1) {");
+        write("throw new EOFException(\"Unexpected end of input stream.\");");
+        write("}");
+        write("throw new IOException(\"Decoded sequence has wrong end of contents octets\");");
+        write("}");
+        write("codeLength += subCodeLength + 1;");
+
+        write("return codeLength;");
+        write("}\n");
+    }
+
+
+
+
 
     private String getName(AsnElementType componentType) {
         return cleanUpName(componentType.name);

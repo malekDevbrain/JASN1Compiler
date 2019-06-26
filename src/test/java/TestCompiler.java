@@ -6,12 +6,6 @@ public class TestCompiler {
     private static final String rootPackageName = "org.jasn1.compiler";
     String[] args;
 
-    // @Test
-    // public void testCompilingEmbeddedPdv() throws Exception {
-    // args = new String[] { "-o", "../jasn1/src/main/java/", "-p", "org.openmuc.jasn1.ber", "-f",
-    // "src/test/resources/embedded-pdv.asn" };
-    // Compiler.main(args);
-    // }
 
     @Test
     public void testCompiling() throws Exception {
