@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.openmuc.jasn1.compiler.cli.CliParameter;
 import org.openmuc.jasn1.compiler.cli.CliParameterBuilder;
@@ -96,5 +97,12 @@ public class Compiler {
 
         return model;
     }
+
+
+
+
+
+
+
 
 }

@@ -14,4 +14,12 @@ public class TestCompiler {
         Compiler.main(args);
     }
 
+    @Test
+    public void testCompilingBer() throws Exception {
+        args = new String[] { "-o", generatedSrcDir, "-p", rootPackageName, "-f",
+                "C:/Users/datarox/IdeaProjects/JASN1Compiler/src/main/resources/x690-ber-example.asn" };
+        Compiler.main(args);
+    }
+
+
 }
