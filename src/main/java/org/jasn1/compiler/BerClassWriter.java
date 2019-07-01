@@ -1112,6 +1112,10 @@ public class BerClassWriter {
                 return "String";
             }
 
+            else if (asnCharacterString.stringtype.equals("UTF8String")) {
+                return "String";
+            }
+
 
             return ((AsnCharacterString) asnType).stringtype;
         }

@@ -7,6 +7,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+
+
 import org.openmuc.jasn1.compiler.cli.CliParameter;
 import org.openmuc.jasn1.compiler.cli.CliParameterBuilder;
 import org.openmuc.jasn1.compiler.cli.CliParseException;
@@ -20,6 +22,7 @@ import org.openmuc.jasn1.compiler.parser.ASNLexer;
 import org.openmuc.jasn1.compiler.parser.ASNParser;
 
 public class Compiler {
+
 
     public final static String VERSION = "1.8.0";
 
@@ -85,6 +88,10 @@ public class Compiler {
 
         classWriter.translate();
         System.out.println("done");
+
+
+
+
     }
 
     private static AsnModel getJavaModelFromAsn1File(String inputFileName) throws Exception {
