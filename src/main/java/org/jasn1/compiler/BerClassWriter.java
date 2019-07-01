@@ -32,6 +32,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 
+import org.apache.spark.sql.types.Metadata;
+import org.apache.spark.sql.types.StructField;
+import org.apache.spark.sql.types.StructType;
 import org.openmuc.jasn1.ber.BerTag;
 import org.openmuc.jasn1.ber.types.BerObjectIdentifier;
 import org.openmuc.jasn1.compiler.model.AsnAny;
@@ -63,10 +66,14 @@ import org.openmuc.jasn1.compiler.model.AsnUniversalType;
 import org.openmuc.jasn1.compiler.model.AsnValueAssignment;
 import org.openmuc.jasn1.compiler.model.SymbolsFromModule;
 
+import static org.apache.spark.sql.types.DataTypes.StringType;
+
 public class BerClassWriter {
 
     private static Tag stdSeqTag = new Tag();
     private static Tag stdSetTag = new Tag();
+
+    public static StructType inferredSchema;
 
     static {
         stdSeqTag.tagClass = TagClass.UNIVERSAL;
@@ -988,15 +995,36 @@ public class BerClassWriter {
 
     private void writePublicMembers(List<AsnElementType> componentTypes) throws IOException {
         for (AsnElementType element : componentTypes) {
+
             if (jaxbMode) {
-                write("private " + element.className + " " + cleanUpName(element.name) + " = null;");
+
+                if(element.className .equals("String") || element.className .equals("int")){
+
+
+                    inferredSchema.add(
+                            new StructField(cleanUpName(element.name),StringType,true, Metadata.empty())
+
+
+                    );
+
+                System.out.println("private " + element.className + " " + cleanUpName(element.name) + " = null;");
             }
             else {
-                write("public " + element.className + " " + cleanUpName(element.name) + " = null;");
+                    if(element.className .equals("String") || element.className .equals("int") ){
+
+
+                        inferredSchema.add(
+                                new StructField(cleanUpName(element.name),StringType,true, Metadata.empty())
+
+
+                        );
+
+                }
+                System.out.println("public " + element.className + " " + cleanUpName(element.name) + " = null;");
             }
         }
         write("");
-    }
+    }}
 
     private boolean isInnerType(AsnElementType element) {
         return element.typeReference != null && (element.typeReference instanceof AsnConstructedType);
