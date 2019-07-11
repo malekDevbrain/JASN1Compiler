@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 
+import com.sun.scenario.effect.impl.sw.sse.SSEBlend_SRC_OUTPeer;
 import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
@@ -66,14 +67,18 @@ import org.openmuc.jasn1.compiler.model.AsnUniversalType;
 import org.openmuc.jasn1.compiler.model.AsnValueAssignment;
 import org.openmuc.jasn1.compiler.model.SymbolsFromModule;
 
+import static org.apache.spark.sql.types.DataTypes.IntegerType;
 import static org.apache.spark.sql.types.DataTypes.StringType;
 
 public class BerClassWriter {
 
+
+
+
+
+
     private static Tag stdSeqTag = new Tag();
     private static Tag stdSetTag = new Tag();
-
-    public static StructType inferredSchema;
 
     static {
         stdSeqTag.tagClass = TagClass.UNIVERSAL;
@@ -187,7 +192,7 @@ public class BerClassWriter {
 
             String typeName = cleanUpName(typeDefinition.name);
 
-            writeClassHeader(typeName, module);
+
 
             if (typeDefinition instanceof AsnTaggedType) {
 
@@ -221,54 +226,14 @@ public class BerClassWriter {
                 writeRetaggingTypeClass(typeName, getBerType(typeDefinition), typeDefinition, null);
             }
 
-            out.close();
+
         }
 
-        writeOidValues(module);
+
 
     }
 
-    private void writeOidValues(AsnModule module) throws IOException {
-        boolean first = true;
-        List<String> values = new ArrayList<>(module.asnValueAssignmentsByName.keySet());
-        Collections.sort(values);
-        for (String valueName : values) {
-            if (module.asnValueAssignmentsByName.get(valueName).type instanceof AsnObjectIdentifier) {
-                BerObjectIdentifier oid;
-                try {
-                    oid = parseObjectIdentfierValue(valueName, module);
-                } catch (IllegalStateException e) {
-                    System.out.println("Warning: could not parse object identifier value: " + e.getMessage());
-                    continue;
-                }
-                StringBuilder sb = new StringBuilder("public static final BerObjectIdentifier " + cleanUpName(valueName)
-                        + " = new BerObjectIdentifier(new int[]{");
-                if (first == true) {
-                    first = false;
-                    writeClassHeader("OidValues", module);
-                    write("public final class OidValues {");
-                }
 
-                boolean firstOidComponent = true;
-                for (int i : oid.value) {
-                    if (firstOidComponent) {
-                        firstOidComponent = false;
-                    }
-                    else {
-                        sb.append(", ");
-                    }
-                    sb.append(i);
-                }
-                sb.append("});");
-                write(sb.toString());
-
-            }
-        }
-        if (first == false) {
-            write("}");
-            out.close();
-        }
-    }
 
     private String sanitizeModuleName(String name) {
         String[] moduleParts = name.split("-");
@@ -282,117 +247,9 @@ public class BerClassWriter {
         return toReturn;
     }
 
-    private BerObjectIdentifier parseObjectIdentfierValue(String name, AsnModule module) throws IOException {
 
-        AsnValueAssignment valueAssignment = module.asnValueAssignmentsByName.get(name);
 
-        if (valueAssignment == null || !(valueAssignment.type instanceof AsnObjectIdentifier)) {
-            return null;
-            // throw new IOException(
-            // "no object identifier named \"" + name + "\" in module \"" + module.moduleIdentifier.name);
-        }
 
-        if (!valueAssignment.value.isValueInBraces) {
-            throw new IllegalStateException(
-                    "value of object identifier \"" + valueAssignment.name + "\" is not defined in braces.");
-        }
-        List<Integer> oidComponents = new ArrayList<>();
-
-        List<String> tokens = valueAssignment.value.valueInBracesTokens;
-
-        for (int i = 0; i < tokens.size(); i++) {
-            String token = tokens.get(i);
-
-            if (Character.isDigit(token.charAt(0))) {
-                oidComponents.add(Integer.parseInt(token));
-            }
-            else if (Character.isLetter(token.charAt(0))) {
-                if ((tokens.size() == i + 1) || !tokens.get(i + 1).equals("(")) {
-                    // this is either a value reference of another object identifier or a registered name
-                    if (!parseRegisteredOidComponentName(oidComponents, token)) {
-
-                        BerObjectIdentifier oid = parseObjectIdentfierValue(token, module);
-                        if (oid == null) {
-                            for (SymbolsFromModule symbolsFromModule : module.importSymbolFromModuleList) {
-                                for (String importedTypeName : symbolsFromModule.symbolList) {
-                                    if (token.equals(importedTypeName)) {
-                                        oid = parseObjectIdentfierValue(token,
-                                                modulesByName.get(symbolsFromModule.modref));
-                                    }
-                                }
-                            }
-                        }
-                        if (oid == null) {
-                            throw new IllegalStateException("AsnValueAssigment \"" + token
-                                    + "\" was not found in module \"" + module.moduleIdentifier.name + "\"");
-                        }
-                        for (int element : oid.value) {
-                            oidComponents.add(element);
-                        }
-                    }
-                }
-            }
-        }
-        return new BerObjectIdentifier(toIntArray(oidComponents));
-    }
-
-    private boolean parseRegisteredOidComponentName(List<Integer> oidComponents, String token) throws IOException {
-        if (oidComponents.size() == 0) {
-            switch (token) {
-                case "itu-t":
-                case "ccitt":
-                    oidComponents.add(0);
-                    return true;
-                case "iso":
-                    oidComponents.add(1);
-                    return true;
-                case "joint-iso-itu-t":
-                case "joint-iso-ccitt":
-                    oidComponents.add(2);
-                    return true;
-            }
-        }
-        else if (oidComponents.size() == 1) {
-            switch (oidComponents.get(0)) {
-                case 0:
-                    switch (token) {
-                        case "recommendation":
-                            oidComponents.add(0);
-                            return true;
-                        case "question":
-                            oidComponents.add(1);
-                            return true;
-                        case "administration":
-                            oidComponents.add(2);
-                            return true;
-                        case "network-operator":
-                            oidComponents.add(3);
-                            return true;
-                        case "identified-organization":
-                            oidComponents.add(4);
-                            return true;
-                    }
-
-                case 1:
-                    switch (token) {
-                        case "standard":
-                            oidComponents.add(0);
-                            return true;
-                        case "registration-authority":
-                            oidComponents.add(1);
-                            return true;
-                        case "member-body":
-                            oidComponents.add(2);
-                            return true;
-                        case "identified-organization":
-                            oidComponents.add(3);
-                            return true;
-                    }
-            }
-        }
-        return false;
-
-    }
 
     /**
      * Gets the tag from the AsnTaggedType structure. The returned tag will contain the correct class and type (explicit
@@ -575,10 +432,15 @@ public class BerClassWriter {
             writeGetterAndSetter(componentTypes);
         }
 
+
+
+
+
+
+
         write("}\n");
 
     }
-
 
     private void setClassNamesOfComponents(List<String> listOfSubClassNames, List<AsnElementType> componentTypes) {
         for (AsnElementType element : componentTypes) {
@@ -739,6 +601,9 @@ public class BerClassWriter {
 
         boolean hasExplicitTag = (tag != null) && (tag.type == TagType.EXPLICIT);
 
+
+
+
         write("}\n");
 
     }
@@ -758,6 +623,7 @@ public class BerClassWriter {
             }
         }
     }
+
 
 
 
@@ -820,6 +686,14 @@ public class BerClassWriter {
         }
 
         boolean hasExplicitTag = (tag != null) && (tag.type == TagType.EXPLICIT);
+
+
+
+
+
+
+
+
 
         write("}\n");
 
@@ -951,9 +825,18 @@ public class BerClassWriter {
     }
 
 
+
+
+
+
     private static String getBerTagParametersString(Tag tag) {
         return "BerTag." + tag.tagClass + "_CLASS, BerTag." + tag.typeStructure.toString() + ", " + tag.value;
     }
+
+
+
+
+
 
 
 
@@ -978,6 +861,35 @@ public class BerClassWriter {
     }
 
 
+
+    private int getTagClassId(String tagClass) {
+
+        if (tagClass.equals("UNIVERSAL")) {
+            return BerTag.UNIVERSAL_CLASS;
+        }
+        else if (tagClass.equals("APPLICATION")) {
+            return BerTag.APPLICATION_CLASS;
+        }
+        else if (tagClass.equals("CONTEXT")) {
+            return BerTag.CONTEXT_CLASS;
+        }
+        else if (tagClass.equals("PRIVATE")) {
+            return BerTag.PRIVATE_CLASS;
+        }
+        else {
+            throw new IllegalStateException("unknown tag class: " + tagClass);
+        }
+
+    }
+
+    private String getName(AsnElementType componentType) {
+        return cleanUpName(componentType.name);
+    }
+
+    private boolean isOptional(AsnElementType componentType) {
+        return (componentType.isOptional || componentType.isDefault);
+    }
+
     private boolean isExplicit(Tag tag) {
         return (tag != null) && (tag.type == TagType.EXPLICIT);
     }
@@ -996,34 +908,30 @@ public class BerClassWriter {
     private void writePublicMembers(List<AsnElementType> componentTypes) throws IOException {
         for (AsnElementType element : componentTypes) {
 
-            if (jaxbMode) {
-
-                if(element.className .equals("String") || element.className .equals("int")){
 
 
-                    inferredSchema.add(
+                if(element.className .equals("String") ){
+
+
+                    InferredSchema.inferredSchema=InferredSchema.inferredSchema.add(
                             new StructField(cleanUpName(element.name),StringType,true, Metadata.empty())
-
 
                     );
 
-                System.out.println("private " + element.className + " " + cleanUpName(element.name) + " = null;");
-            }
-            else {
-                    if(element.className .equals("String") || element.className .equals("int") ){
+                }
+                else if(element.className .equals("Integer")) {
 
-
-                        inferredSchema.add(
-                                new StructField(cleanUpName(element.name),StringType,true, Metadata.empty())
-
+                    InferredSchema.inferredSchema=InferredSchema.inferredSchema.add(
+                                new StructField(cleanUpName(element.name),IntegerType,true, Metadata.empty())
 
                         );
 
+
+
                 }
-                System.out.println("public " + element.className + " " + cleanUpName(element.name) + " = null;");
-            }
-        }
-        write("");
+
+            System.out.println(InferredSchema.inferredSchema);
+
     }}
 
     private boolean isInnerType(AsnElementType element) {
@@ -1141,11 +1049,11 @@ public class BerClassWriter {
             }
 
             else if (asnCharacterString.stringtype.equals("UTF8String")) {
+
                 return "String";
             }
 
-
-            return ((AsnCharacterString) asnType).stringtype;
+            return  ((AsnCharacterString) asnType).stringtype;
         }
         return className.substring(3);
     }
@@ -1334,68 +1242,11 @@ public class BerClassWriter {
         return !(asnType instanceof AsnConstructedType || asnType instanceof AsnEmbeddedPdv);
     }
 
-    private void writeClassHeader(String typeName, AsnModule module) throws IOException {
-
-        outputDirectory.mkdirs();
-        System.out.println("claaaaaass name :"+ typeName);
-
-        FileWriter fstream = new FileWriter(new File(outputDirectory, typeName + ".java"));
-        out = new BufferedWriter(fstream);
-
-        write("/**");
-        write(" * This class file was automatically generated by jASN1 v" + Compiler.VERSION
-                + " (http://www.openmuc.org)\n */\n");
-        write("package " + basePackageName
-                + sanitizeModuleName(module.moduleIdentifier.name).replace('-', '.').toLowerCase() + ";\n");
-
-        write("import java.io.IOException;");
-        write("import java.io.EOFException;");
-        write("import java.io.InputStream;");
-        write("import java.util.List;");
-        write("import java.util.ArrayList;");
-        write("import java.util.Iterator;");
-        write("import java.io.UnsupportedEncodingException;");
-        write("import java.math.BigInteger;");
-        write("import java.io.Serializable;");
-
-        write("import org.openmuc.jasn1.ber.*;");
-        write("import org.openmuc.jasn1.ber.types.*;");
-        write("import org.openmuc.jasn1.ber.types.string.*;\n");
-
-        List<String> importedClassesFromOtherModules = new ArrayList<>();
-
-        for (SymbolsFromModule symbolsFromModule : module.importSymbolFromModuleList) {
-            AsnModule importedModule = modulesByName.get(symbolsFromModule.modref);
-            for (String importedSymbol : symbolsFromModule.symbolList) {
-                if (Character.isUpperCase(importedSymbol.charAt(0))) {
-                    if (importedModule.typesByName.get(importedSymbol) != null) {
-                        importedClassesFromOtherModules.add(
-                                sanitizeModuleName(importedModule.moduleIdentifier.name).replace('-', '.').toLowerCase()
-                                        + "." + cleanUpName(importedSymbol) + ";");
-                    }
-                }
-            }
-        }
-        Collections.sort(importedClassesFromOtherModules);
-        for (String modulePackage : importedClassesFromOtherModules) {
-            write("import " + basePackageName + modulePackage);
-        }
-        write("");
-
-    }
-
     private void write(String line) throws IOException {
-        if (line.startsWith("}")) {
-            indentNum--;
-        }
-        for (int i = 0; i < indentNum; i++) {
-            out.write("\t");
-        }
-        out.write(line + "\n");
 
-        if (line.endsWith(" {") || line.endsWith(" {\n") || line.endsWith(" {\n\n")) {
-            indentNum++;
-        }
+
+
+
     }
 
 }

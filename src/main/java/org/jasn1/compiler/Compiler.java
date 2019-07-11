@@ -1,14 +1,18 @@
 package org.jasn1.compiler;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 
-
+import org.apache.spark.sql.types.Metadata;
+import org.apache.spark.sql.types.StructField;
+import org.apache.spark.sql.types.StructType;
 import org.openmuc.jasn1.compiler.cli.CliParameter;
 import org.openmuc.jasn1.compiler.cli.CliParameterBuilder;
 import org.openmuc.jasn1.compiler.cli.CliParseException;
@@ -21,12 +25,26 @@ import org.openmuc.jasn1.compiler.model.AsnModule;
 import org.openmuc.jasn1.compiler.parser.ASNLexer;
 import org.openmuc.jasn1.compiler.parser.ASNParser;
 
+import static org.apache.spark.sql.types.DataTypes.StringType;
+
+
 public class Compiler {
 
 
     public final static String VERSION = "1.8.0";
 
-    public static void main(String args[]) throws Exception {
+    public static void inferredSchema(String path) throws Exception {
+
+
+        String generatedSrcDir = "src/main/java";
+        String rootPackageName = "org.jasn1.compiler";
+
+        String[] args ;
+       args = new String[] { "-o", generatedSrcDir, "-p", rootPackageName, "-f",
+               path };
+
+
+
 
         StringCliParameter outputBaseDir = new CliParameterBuilder("-o")
                 .setDescription(
@@ -104,10 +122,6 @@ public class Compiler {
 
         return model;
     }
-
-
-
-
 
 
 
